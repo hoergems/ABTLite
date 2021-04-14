@@ -14,7 +14,7 @@ namespace solvers {
 ABTLite::ABTLite():
 	Solver(),
 	beliefTree_(nullptr) {
-	solverName_ = "ABT";
+	solverName_ = "ABTLite";
 }
 
 void ABTLite::setup() {
@@ -23,6 +23,7 @@ void ABTLite::setup() {
 	auto options = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_);
 	FloatType maxObservationDistance = options->maxObservationDistance;
 
+	// A function to determine whether two observations are equal.
 	observationComparator_ = [maxObservationDistance](const Observation * observation, TreeElement * treeElement) {
 		auto it = treeElement->getChildren();
 		unsigned int numChildren = treeElement->getNumChildren();
@@ -77,17 +78,17 @@ bool ABTLite::improvePolicy(const FloatType &timeout) {
 	cout << "PLANNING FROM:" << endl;
 	beliefTree_->getRoot()->print();
 
-	size_t numSampledHistories = 0;
-	unsigned long historiesPerStep = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_)->historiesPerStep;
+	size_t numSampledEpisodes = 0;
+	unsigned long maxNumEpisodes = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_)->historiesPerStep;
 	FloatType endTime = oppt::clock_ms() + timeout;
 	while (true) {
 		//sampleHistory_();
 		EpisodePtr episode = std::move(sampleEpisode_());
 		backupEpisode_(episode.get());
-		//beliefTree_->getRoot()->getData()->as<BeliefNodeData>()->addEpisode(std::move(episode));
-		numSampledHistories++;
-		if (historiesPerStep > 0) {
-			if (numSampledHistories == historiesPerStep)
+		beliefTree_->getRoot()->getData()->as<BeliefNodeData>()->addEpisode(std::move(episode));
+		numSampledEpisodes++;
+		if (maxNumEpisodes > 0) {
+			if (numSampledEpisodes == maxNumEpisodes)
 				break;
 		} else {
 			if (oppt::clock_ms() >= endTime)
@@ -95,12 +96,13 @@ bool ABTLite::improvePolicy(const FloatType &timeout) {
 		}
 	}
 
-	cout << "Sampled " << numSampledHistories << " histories" << endl;
+	cout << "Sampled " << numSampledEpisodes << " episodes" << endl;
 
 	return true;
 }
 
 EpisodePtr ABTLite::sampleEpisode_() {
+	auto options = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_);
 	TreeElement *currentBelief = beliefTree_->getRoot();
 	PropagationRequestSharedPtr propagationRequest(new PropagationRequest);
 	ObservationRequestSharedPtr observationRequest(new ObservationRequest);
@@ -111,17 +113,15 @@ EpisodePtr ABTLite::sampleEpisode_() {
 	std::shared_ptr<HeuristicInfo> heuristicInfo(new HeuristicInfo);
 	EpisodePtr episode(new Episode);
 
+	// Sample a state from the current belief
 	RobotStateSharedPtr state = currentBelief->as<ABTBeliefNode>()->sampleParticle();
-
-	auto options = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_);
-
-	FloatType explorationFactor = options->ucbExplorationFactor;
+	
 	auto randomEngine = robotPlanningEnvironment_->getRobot()->getRandomEngine().get();
 
 	while (true) {
 		if (!currentBelief)
 			ERROR("No belief");
-		auto action = currentBelief->as<ABTBeliefNode>()->getUCBAction(explorationFactor);
+		auto action = currentBelief->as<ABTBeliefNode>()->getUCBAction(options->ucbExplorationFactor);
 		if (!action) {
 			ERROR("No action")
 		}
@@ -143,9 +143,9 @@ EpisodePtr ABTLite::sampleEpisode_() {
 		terminal = robotPlanningEnvironment_->isTerminal(propRes);
 
 		episode->addEpisodeEntry(currentBelief, state, action, obsRes->observation, reward, terminal);
-
-		// Go to the next belief
 		state = propRes->nextState;
+
+		// Go to the next belief		
 		currentBelief = currentBelief->as<ABTBeliefNode>()->getOrCreateChild<ABTBeliefNode>(action, obsRes->observation, randomEngine);
 		if (terminal) {
 			episode->addEpisodeEntry(currentBelief, nullptr, nullptr, nullptr, 0.0, terminal);
@@ -160,7 +160,7 @@ EpisodePtr ABTLite::sampleEpisode_() {
 			// Make the outgoing edges for the new belief
 			initBeliefNode_(currentBelief);
 
-			// If the belief is new, get a heuristic value
+			// If the belief is new, get a heuristic estimate
 			heuristicInfo->currentState = state;
 			heuristicInfo->action = action;
 			heuristicInfo->discountFactor = problemEnvironmentOptions_->discountFactor;
