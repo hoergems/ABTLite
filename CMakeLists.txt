@@ -18,10 +18,6 @@ else()
 endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/OPPTTree/CMakeLists.txt)
-message("==============================================")
-message("${OPPT_TREE_SRC}")
-message("==============================================")
-
 add_executable(abtLite
                ${CMAKE_CURRENT_LIST_DIR}/main.cpp
                ${CMAKE_CURRENT_LIST_DIR}/src/Solver.cpp          
