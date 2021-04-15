@@ -27,8 +27,10 @@ public:
     /** Reset the policy after every step */
     bool resetPolicy = false;
 
+    std::string searchStrategyStr = "";
+
     /** The UCB exploration factor */
-    FloatType ucbExplorationFactor = 2.0;
+    mutable FloatType ucbExplorationFactor = 2.0;
 
     /* ---------- ABT settings: advanced customization  ---------- */
     /** The maximum distance between observations to group together; only applicable if
@@ -65,7 +67,8 @@ public:
         parser->addOptionWithDefault<std::vector<unsigned int>>("ABT",
                 "actionDiscretization",
                 &ABTLiteOptions::actionDiscretization, defaultUIntVec);
-        parser->addOption<FloatType>("ABT", "ucbExplorationFactor", &ABTLiteOptions::ucbExplorationFactor);
+
+        parser->addOption<std::string>("ABT", "searchStrategy", &ABTLiteOptions::searchStrategyStr);
         parser->addOptionWithDefault<bool>("ABT", "resetPolicy", &ABTLiteOptions::resetPolicy, false);
     }    
 };

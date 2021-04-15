@@ -38,7 +38,9 @@ private:
 
 	void backupEpisode_(Episode *historySequence);
 
-	void initBeliefNode_(TreeElement *const belief);	
+	void initBeliefNode_(TreeElement *const belief);
+
+	void parseUcbExplorationFactor_();	
 
 private:
 	std::unique_ptr<Tree> beliefTree_;

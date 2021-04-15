@@ -19,8 +19,9 @@ ABTLite::ABTLite():
 
 void ABTLite::setup() {
 	reset();
+	parseUcbExplorationFactor_();
+	auto options = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_);	
 
-	auto options = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_);
 	FloatType maxObservationDistance = options->maxObservationDistance;
 
 	// A function that returns, for a given action edge, the observation edge whose corresponding observation is closest
@@ -282,6 +283,20 @@ VectorRobotStatePtr ABTLite::getBeliefParticles() {
 
 void ABTLite::stepFinished(const size_t &step) {
 
+}
+
+void ABTLite::parseUcbExplorationFactor_() {
+	auto options = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_);
+	if (options->searchStrategyStr.find("ucb") == std::string::npos or 
+		options->searchStrategyStr.find("(") == std::string::npos or 
+		options->searchStrategyStr.find(")") == std::string::npos) 
+		ERROR("'searchStrategy' option malformed. It should be of the form 'searchStrategy = ucb(2.0)'");
+	
+	VectorString stringElems;
+	oppt::split(options->searchStrategyStr, "(", stringElems);
+	VectorString stringElems2;
+	oppt::split(stringElems[1], ")", stringElems2);		
+	options->ucbExplorationFactor = atof(stringElems2[0].c_str());
 }
 
 
