@@ -1,5 +1,5 @@
 #include "Episode.hpp"
-#include <OpptTree/TreeElement.hpp>
+#include "TreeElement.hpp"
 
 namespace oppt {
 EpisodeEntry::EpisodeEntry(TreeElement *const beliefNode,

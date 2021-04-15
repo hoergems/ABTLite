@@ -23,7 +23,9 @@ void ABTLite::setup() {
 	auto options = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_);
 	FloatType maxObservationDistance = options->maxObservationDistance;
 
-	// A function to determine whether two observations are equal.
+	// A function that returns, for a given action edge, the observation edge whose corresponding observation is closest
+	// (in terms of the distance metric defined in oppt::Observation::distanceTo() ) to the input observation.
+	// If the distance to the closest observation is larger than maxObservationDistance, a nullptr is returned.
 	observationComparator_ = [maxObservationDistance](const Observation * observation, TreeElement * treeElement) {
 		auto it = treeElement->getChildren();
 		unsigned int numChildren = treeElement->getNumChildren();
@@ -50,26 +52,24 @@ void ABTLite::setup() {
 }
 
 bool ABTLite::reset() {
+	auto options = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_);
 	beliefTree_ = std::make_unique<Tree>();
 	beliefTree_->initRoot<ABTBeliefNode>();
-
 	TreeElement *const root = beliefTree_->getRoot();
 
 	TreeElementDataPtr rootData(new BeliefNodeData(root, robotPlanningEnvironment_));
 	root->setData(std::move(rootData));
 
 	oppt::ActionSpaceSharedPtr actionSpace = robotPlanningEnvironment_->getRobot()->getActionSpace();
-	auto options_ = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_);
-
 	auto actionSpaceDiscretizer = actionSpace->getActionSpaceDiscretizer();
 	if (!actionSpaceDiscretizer) {
 		actionSpaceDiscretizer = std::make_shared<oppt::ActionSpaceDiscretizer>(actionSpace);
-		if (options_->actionDiscretization.size() > 0) {
-			actionSpaceDiscretizer = std::make_unique<CustomActionSpaceDiscretizer>(actionSpace, options_->actionDiscretization);
+		if (options->actionDiscretization.size() > 0) {
+			actionSpaceDiscretizer = std::make_unique<CustomActionSpaceDiscretizer>(actionSpace, options->actionDiscretization);
 		}
 	}
 
-	allActions_ = actionSpaceDiscretizer->getAllActionsInOrder(options_->numInputStepsActions);
+	allActions_ = actionSpaceDiscretizer->getAllActionsInOrder(options->numInputStepsActions);
 	initBeliefNode_(root);
 	return true;
 }
@@ -79,17 +79,18 @@ bool ABTLite::improvePolicy(const FloatType &timeout) {
 	beliefTree_->getRoot()->print();
 
 	size_t numSampledEpisodes = 0;
-	unsigned long maxNumEpisodes = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_)->historiesPerStep;
+	unsigned long maxNumEpisodes = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_)->maxNumEpisodes;
 	FloatType endTime = oppt::clock_ms() + timeout;
 	while (true) {
-		//sampleHistory_();
+		// Sample an episode starting from the current belief
 		EpisodePtr episode = std::move(sampleEpisode_());
+
+		// Backup the episode
 		backupEpisode_(episode.get());
 		beliefTree_->getRoot()->getData()->as<BeliefNodeData>()->addEpisode(std::move(episode));
 		numSampledEpisodes++;
-		if (maxNumEpisodes > 0) {
-			if (numSampledEpisodes == maxNumEpisodes)
-				break;
+		if (maxNumEpisodes > 0 and numSampledEpisodes == maxNumEpisodes) {
+			break;
 		} else {
 			if (oppt::clock_ms() >= endTime)
 				break;
@@ -115,8 +116,9 @@ EpisodePtr ABTLite::sampleEpisode_() {
 
 	// Sample a state from the current belief
 	RobotStateSharedPtr state = currentBelief->as<ABTBeliefNode>()->sampleParticle();
-	
+
 	auto randomEngine = robotPlanningEnvironment_->getRobot()->getRandomEngine().get();
+	size_t depth = 0;
 
 	while (true) {
 		if (!currentBelief)
@@ -139,32 +141,39 @@ EpisodePtr ABTLite::sampleEpisode_() {
 		// Get reward
 		reward = robotPlanningEnvironment_->getReward(propRes);
 
-		// Check if we're terminal
+		// Check if the sampled next state is terminal
 		terminal = robotPlanningEnvironment_->isTerminal(propRes);
 
 		episode->addEpisodeEntry(currentBelief, state, action, obsRes->observation, reward, terminal);
 		state = propRes->nextState;
 
-		// Go to the next belief		
+		// Go to the next belief
 		currentBelief = currentBelief->as<ABTBeliefNode>()->getOrCreateChild<ABTBeliefNode>(action, obsRes->observation, randomEngine);
+		depth++;
+
 		if (terminal) {
 			episode->addEpisodeEntry(currentBelief, nullptr, nullptr, nullptr, 0.0, terminal);
 			break;
 		}
 
-		// Check if the belief is new
+		bool requireHeuristic = false;
+		if (depth == options->maximumDepth)
+			requireHeuristic = true;
+
+
+		// If the belief node is new, initialize it and compute an heuristic estimate of its value
 		if (currentBelief->getData() == nullptr) {
 			TreeElementDataPtr beliefNodeData(new BeliefNodeData(currentBelief, robotPlanningEnvironment_));
 			currentBelief->setData(std::move(beliefNodeData));
-
-			// Make the outgoing edges for the new belief
 			initBeliefNode_(currentBelief);
+			requireHeuristic = true;
+		}
 
-			// If the belief is new, get a heuristic estimate
+		if (requireHeuristic) {
 			heuristicInfo->currentState = state;
 			heuristicInfo->action = action;
 			heuristicInfo->discountFactor = problemEnvironmentOptions_->discountFactor;
-			heuristicInfo->timeout = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_)->heuristicTimeout;
+			heuristicInfo->timeout = options->heuristicTimeout;
 			FloatType heuristic = heuristicPlugin_->getHeuristicValue(heuristicInfo.get());
 			episode->addEpisodeEntry(currentBelief, nullptr, nullptr, nullptr, heuristic, false);
 			break;
@@ -238,9 +247,9 @@ bool ABTLite::updateBelief(const ActionSharedPtr& action,
 	            observation,
 	            randomEngine.get());
 	TreeElementPtr newBelief = std::move(childBelief->getParent()->releaseChild(childBelief));
-	if (newBelief->getData() == nullptr or options->resetTree) {
-		if (options->resetTree)
-			LOGGING("RESETTING TREE");
+	if (newBelief->getData() == nullptr or options->resetPolicy) {
+		if (options->resetPolicy)
+			LOGGING("RESETTING POLICY");
 		TreeElementDataPtr beliefNodeData(new BeliefNodeData(newBelief.get(), robotPlanningEnvironment_));
 		newBelief->setData(std::move(beliefNodeData));
 		initBeliefNode_(newBelief.get());

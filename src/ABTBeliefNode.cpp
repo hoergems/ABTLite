@@ -66,9 +66,9 @@ const Action *ABTBeliefNode::getUCBAction(const FloatType &explorationFactor) {
 		actionSequence_.pop_back();
 		return untriedAction;
 	}
+
 	FloatType bestUCBScore = -std::numeric_limits<FloatType>::infinity();
 	const Action *bestAction = nullptr;
-	std::vector<const Action *> untriedActions;
 	for (auto &child : children_) {
 		FloatType numVisits = child->getData()->as<ActionEdgeData>()->getNumVisits();
 		FloatType meanQValue = child->getData()->as<ActionEdgeData>()->getMeanQ();
@@ -79,11 +79,7 @@ const Action *ABTBeliefNode::getUCBAction(const FloatType &explorationFactor) {
         }
 
 	}
-
-	if (untriedActions.size() > 0) {
-		//action = 
-	}
-
+	
 	if (!bestAction)
 		WARNING("Retuning null action");
 
@@ -112,7 +108,7 @@ long ABTBeliefNode::getTotalVisitCount() const {
 	return totalVisitCount_;
 }
 
-void ABTBeliefNode::updateVisitCount(const long &visitCount) {
+void ABTBeliefNode::updateVisitCount(const long &visitCount) {	
 	totalVisitCount_ += visitCount;
 	if (totalVisitCount_ < 0)
 		totalVisitCount_ = 0;

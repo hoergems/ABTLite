@@ -15,22 +15,46 @@ public:
 
 	virtual void print() const override;
 
-	RobotStateSharedPtr sampleParticle() const;
+	/**
+	 * Sample a particle from this belief
+	 */
+	RobotStateSharedPtr sampleParticle() const;	
 
-	const Action* getNextAction(const FloatType &explorationFactor) const;
-
+	/**
+	 * Get the action with the largest Q-value from this belief
+	 */
 	const Action* getBestAction() const;
 
+	/**
+	 * Recalculate the value of this belief according to V(b) = max_a Q(b, a)
+	 */
 	FloatType recalculateValue();
 
+	/**
+	 * Get the estimated value V(b) of this belief
+	 */
 	FloatType getCachedValue();
 
+	/**
+	 * Get the total number of times we have visited this belief during the episode sampling process
+	 */
 	long getTotalVisitCount() const;
 
+	/**
+	 * Update the visitation count
+	 */
 	void updateVisitCount(const long &visitCount);
 
+	/**
+	 * Initialize a random sequence of actions to be selected from this belief (via getUCBAction)
+	 * during the episode sampling process. Once all actions have been selected at least once,
+	 * the actions are selected according to UCB1.
+	 */
 	void initActionSequence(RandomEngine *randomEngine);
 
+	/**
+	 * @brief Get or create the child node given an action and observation. If no such child exists, create one.
+	 */
 	template<typename NodeType>
 	TreeElement *const getOrCreateChild(const Action *action, const ObservationSharedPtr &observation, RandomEngine *const randomEngine) {
 		TreeElement *childActionEdge = nullptr;
@@ -42,19 +66,15 @@ public:
 		if (!childActionEdge) {
 			std::unique_ptr<TreeElement> actionEdge(new ABTActionEdge(this, action, randomEngine));
 			childActionEdge = addChild(std::move(actionEdge));
-		}
-
-		//for (auto &arg: {args...}) {
-		//	static_cast<const BeliefNode *>(arg);
-		//}
-
-		//for(auto &&arg: { args... }) {
-		//}
+		}		
 
 		TreeElement *const observationEdge = childActionEdge->as<ABTActionEdge>()->getOrCreateObservationEdge(observation);
 		return observationEdge->as<ABTObservationEdge>()->createOrGetChild<NodeType>();
 	}
 
+	/**
+	 * Select an action from this belief according to UCB1
+	 */
 	const Action *getUCBAction(const FloatType &explorationFactor);
 
 protected:
