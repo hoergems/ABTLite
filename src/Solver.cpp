@@ -32,19 +32,19 @@ void ABTLite::setup() {
 		unsigned int numChildren = treeElement->getNumChildren();
 		unsigned int idx = 0;
 		FloatType smallestDistance = maxObservationDistance;
-		TreeElement *closestObservationEdge = nullptr;
+		TreeElement *closestObservationEdge = nullptr;		
 		while (true) {
 			idx++;
 			if (idx > numChildren)
 				break;
-			FloatType dist = (*it)->as<ABTObservationEdge>()->getObservation()->distanceTo(*observation);
-			if (dist < smallestDistance) {
+			FloatType dist = (*it)->as<ABTObservationEdge>()->getObservation()->distanceTo(*observation);			
+			if (dist <= smallestDistance) {
 				smallestDistance = dist;
 				closestObservationEdge = (*it).get();
 			}
 
 			it++;
-		}
+		}		
 
 		return closestObservationEdge;
 	};
@@ -75,10 +75,7 @@ bool ABTLite::reset() {
 	return true;
 }
 
-bool ABTLite::improvePolicy(const FloatType &timeout) {
-	cout << "PLANNING FROM:" << endl;
-	beliefTree_->getRoot()->print();
-
+bool ABTLite::improvePolicy(const FloatType &timeout) {	
 	size_t numSampledEpisodes = 0;
 	unsigned long maxNumEpisodes = static_cast<const ABTLiteOptions *>(problemEnvironmentOptions_)->maxNumEpisodes;
 	FloatType endTime = oppt::clock_ms() + timeout;
@@ -158,9 +155,8 @@ EpisodePtr ABTLite::sampleEpisode_() {
 		}
 
 		bool requireHeuristic = false;
-		if (depth == options->maximumDepth)
+		if (depth == options->maximumDepth)		
 			requireHeuristic = true;
-
 
 		// If the belief node is new, initialize it and compute an heuristic estimate of its value
 		if (currentBelief->getData() == nullptr) {
@@ -173,8 +169,7 @@ EpisodePtr ABTLite::sampleEpisode_() {
 		if (requireHeuristic) {
 			heuristicInfo->currentState = state;
 			heuristicInfo->action = action;
-			heuristicInfo->discountFactor = problemEnvironmentOptions_->discountFactor;
-			heuristicInfo->timeout = options->heuristicTimeout;
+			heuristicInfo->discountFactor = problemEnvironmentOptions_->discountFactor;			
 			FloatType heuristic = heuristicPlugin_->getHeuristicValue(heuristicInfo.get());
 			episode->addEpisodeEntry(currentBelief, nullptr, nullptr, nullptr, heuristic, false);
 			break;

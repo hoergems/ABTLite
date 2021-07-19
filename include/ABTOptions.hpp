@@ -7,10 +7,7 @@ namespace oppt
 struct ABTLiteOptions: public oppt::ProblemEnvironmentOptions {
 public:
     ABTLiteOptions() = default;
-    virtual ~ABTLiteOptions() = default;
-
-    /* Maximum amount of time in seconds to compute the rollout heuristic. */
-    FloatType heuristicTimeout = 0.1;    
+    virtual ~ABTLiteOptions() = default;   
 
     /** The minimum number of particles to maintain in the active belief node. */
     unsigned long minParticleCount = 1000;
@@ -49,7 +46,6 @@ public:
     }
 
     static void addABTOptions(options::OptionParser* parser) {
-        parser->addOption<FloatType>("ABT", "heuristicTimeout", &ABTLiteOptions::heuristicTimeout);        
         parser->addOptionWithDefault<unsigned long>("ABT", "minParticleCount",
                 &ABTLiteOptions::minParticleCount, 1000);
         parser->addOptionWithDefault<bool>("ABT", "allowZeroWeightParticles",
