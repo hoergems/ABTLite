@@ -1,6 +1,6 @@
 ## System requirements
 - Ubuntu 18.04 or higher
-- OPPT (https://github.com/RDLLab/oppt) v0.5 or higher
+- OPPT (https://github.com/RDLLab/oppt) v0.6 or higher
 
 ## Building
 Once OPPT has been successfully built and installed, navigate to the `` <ABTLite_root_directory>``directory and execute
